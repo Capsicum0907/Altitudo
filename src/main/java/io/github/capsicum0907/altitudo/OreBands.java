@@ -106,12 +106,12 @@ public final class OreBands {
 
         @Override
         public int getMinGenY() {
-            return Dimensions.VANILLA.minY();
+            return Dimensions.VANILLA_OVERWORLD.minY();
         }
 
         @Override
         public int getGenDepth() {
-            return Dimensions.VANILLA.height();
+            return Dimensions.VANILLA_OVERWORLD.height();
         }
     }
 
@@ -155,12 +155,12 @@ public final class OreBands {
         // to -144 - and repeating those too stacks their tails into every repeat.
         // Measured at the floor that made redstone 4.4x vanilla against copper's 1.8x,
         // visibly a deep made of redstone. The slice is what a copy of the slice means.
-        if (sampled >= anchor || sampled < Dimensions.VANILLA.minY()) {
+        if (sampled >= anchor || sampled < Dimensions.VANILLA_OVERWORLD.minY()) {
             return out;
         }
-        int band = anchor - Dimensions.VANILLA.minY();
+        int band = anchor - Dimensions.VANILLA_OVERWORLD.minY();
         int floor = Dimensions.fromConfig().minY();
-        if (band <= 0 || floor >= Dimensions.VANILLA.minY()) {
+        if (band <= 0 || floor >= Dimensions.VANILLA_OVERWORLD.minY()) {
             return out;
         }
         int repeats = (anchor - floor) / band;
@@ -220,7 +220,7 @@ public final class OreBands {
         long ores = ORES.get();
         if (ores == 0) {
             LOGGER.warn("Altitudo recognised no ore placement. Everything below y={} is bare stone.",
-                    Dimensions.VANILLA.minY());
+                    Dimensions.VANILLA_OVERWORLD.minY());
         } else if (ADDED.get() == 0) {
             LOGGER.warn("Altitudo recognised {} ore placements but added none below y={}.",
                     ores, AltitudoConfig.ORE_ANCHOR.get());

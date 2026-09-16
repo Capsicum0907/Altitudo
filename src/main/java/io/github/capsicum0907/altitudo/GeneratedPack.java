@@ -5,10 +5,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiFunction;
 
 import javax.annotation.Nullable;
 
@@ -18,6 +20,7 @@ import com.mojang.logging.LogUtils;
 
 import org.slf4j.Logger;
 
+import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.PackLocationInfo;
@@ -28,7 +31,6 @@ import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.server.packs.resources.IoSupplier;
-import net.minecraft.SharedConstants;
 
 /**
  * A data pack that is computed rather than stored.
@@ -37,23 +39,50 @@ import net.minecraft.SharedConstants;
  * never has to be a file, which is what lets the depth be any number the config
  * says instead of one of a handful of prebuilt packs - the thing the mod this
  * replaces could not do, and the reason it shipped six jars.
+ * <p>
+ * Each entry names the file, the vanilla extent to read it as, and the extent to
+ * write. A dimension this mod is not extending contributes no entries, so leaving
+ * one alone needs no branch anywhere else.
  */
 public final class GeneratedPack implements PackResources {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String NAMESPACE = "minecraft";
 
-    private static final ResourceLocation DIMENSION_TYPE =
-            ResourceLocation.fromNamespaceAndPath(NAMESPACE, "dimension_type/overworld.json");
-    private static final ResourceLocation NOISE_SETTINGS =
-            ResourceLocation.fromNamespaceAndPath(NAMESPACE, "worldgen/noise_settings/overworld.json");
+    /** One generated file: what to read, how to read it, and what to make it say. */
+    private record Entry(ResourceLocation id, Dimensions vanilla, Dimensions target, Transform how) {
+    }
+
+    @FunctionalInterface
+    private interface Transform {
+        JsonObject apply(JsonObject source, Dimensions vanilla, Dimensions target);
+    }
 
     private final PackLocationInfo location;
-    private final Dimensions target;
+    private final List<Entry> entries = new ArrayList<>();
     private final Map<ResourceLocation, byte[]> built = new HashMap<>();
 
-    public GeneratedPack(PackLocationInfo location, Dimensions target) {
+    public GeneratedPack(PackLocationInfo location, Dimensions overworld, Optional<Dimensions> nether) {
         this.location = location;
-        this.target = target;
+        add("overworld", "overworld", Dimensions.VANILLA_OVERWORLD, overworld);
+        nether.ifPresent(target -> add("the_nether", "nether", Dimensions.VANILLA_NETHER, target));
+    }
+
+    /**
+     * Adds the two files one dimension needs.
+     * <p>
+     * ⚠ The two names differ for the nether: its dimension type is
+     * {@code the_nether} and its noise settings are {@code nether}. Registry file
+     * names are not one spelling per dimension, so both are passed rather than one
+     * derived from the other.
+     */
+    private void add(String dimensionType, String noiseSettings, Dimensions vanilla, Dimensions target) {
+        this.entries.add(new Entry(
+                ResourceLocation.fromNamespaceAndPath(NAMESPACE, "dimension_type/" + dimensionType + ".json"),
+                vanilla, target, Rewrite::dimensionType));
+        this.entries.add(new Entry(
+                ResourceLocation.fromNamespaceAndPath(NAMESPACE,
+                        "worldgen/noise_settings/" + noiseSettings + ".json"),
+                vanilla, target, Rewrite::noiseSettings));
     }
 
     @Nullable
@@ -62,21 +91,20 @@ public final class GeneratedPack implements PackResources {
         if (packType != PackType.SERVER_DATA) {
             return null;
         }
-        BiFunction<JsonObject, Dimensions, JsonObject> rewrite = rewriteFor(id);
-        if (rewrite == null) {
+        Entry entry = entryFor(id);
+        if (entry == null) {
             return null;
         }
-        byte[] bytes = this.built.computeIfAbsent(id, key -> build(key, rewrite));
+        byte[] bytes = this.built.computeIfAbsent(id, key -> build(entry));
         return () -> new ByteArrayInputStream(bytes);
     }
 
     @Nullable
-    private static BiFunction<JsonObject, Dimensions, JsonObject> rewriteFor(ResourceLocation id) {
-        if (DIMENSION_TYPE.equals(id)) {
-            return Rewrite::dimensionType;
-        }
-        if (NOISE_SETTINGS.equals(id)) {
-            return Rewrite::noiseSettings;
+    private Entry entryFor(ResourceLocation id) {
+        for (Entry entry : this.entries) {
+            if (entry.id().equals(id)) {
+                return entry;
+            }
         }
         return null;
     }
@@ -89,27 +117,28 @@ public final class GeneratedPack implements PackResources {
      * therefore wins or loses by pack order, the same as it would against any other
      * pack - it is not silently merged.
      */
-    private byte[] build(ResourceLocation id, BiFunction<JsonObject, Dimensions, JsonObject> rewrite) {
+    private byte[] build(Entry entry) {
         // ServerPacksSource#createVanillaPackSource is marked @VisibleForTesting.
         // It is the only public way to read the built-in data without a running
         // server; noted here so the reason is on record if it ever moves.
         try (VanillaPackResources vanilla = ServerPacksSource.createVanillaPackSource()) {
-            IoSupplier<InputStream> source = vanilla.getResource(PackType.SERVER_DATA, id);
+            IoSupplier<InputStream> source = vanilla.getResource(PackType.SERVER_DATA, entry.id());
             if (source == null) {
-                throw new IllegalStateException("vanilla has no " + id);
+                throw new IllegalStateException("vanilla has no " + entry.id());
             }
             JsonObject original;
             try (InputStream in = source.get()) {
                 original = JsonParser.parseReader(
                         new InputStreamReader(in, StandardCharsets.UTF_8)).getAsJsonObject();
             }
-            JsonObject result = rewrite.apply(original, this.target);
-            LOGGER.info("Altitudo rewrote {} for {}..{} (height {}, sea level {}).",
-                    id, this.target.minY(), this.target.topY(),
-                    this.target.height(), this.target.seaLevel());
+            Dimensions target = entry.target();
+            JsonObject result = entry.how().apply(original, entry.vanilla(), target);
+            LOGGER.info("Altitudo rewrote {}: generating {}..{}, box up to {}, sea level {}.",
+                    entry.id(), target.minY(), target.minY() + target.height() - 1,
+                    target.topY(), target.seaLevel());
             return result.toString().getBytes(StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("could not read vanilla's " + id, e);
+            throw new IllegalStateException("could not read vanilla's " + entry.id(), e);
         }
     }
 
@@ -124,11 +153,11 @@ public final class GeneratedPack implements PackResources {
         // named "settings/overworld" and fails on a field it was never going to
         // have. Valid JSON handed to the wrong registry.
         String prefix = path.endsWith("/") ? path : path + "/";
-        for (ResourceLocation id : new ResourceLocation[] { DIMENSION_TYPE, NOISE_SETTINGS }) {
-            if (id.getPath().startsWith(prefix)) {
-                IoSupplier<InputStream> supplier = getResource(packType, id);
+        for (Entry entry : this.entries) {
+            if (entry.id().getPath().startsWith(prefix)) {
+                IoSupplier<InputStream> supplier = getResource(packType, entry.id());
                 if (supplier != null) {
-                    output.accept(id, supplier);
+                    output.accept(entry.id(), supplier);
                 }
             }
         }
@@ -150,7 +179,7 @@ public final class GeneratedPack implements PackResources {
         T section = (T) new PackMetadataSection(
                 Component.literal("Altitudo"),
                 SharedConstants.getCurrentVersion().getPackVersion(PackType.SERVER_DATA),
-                java.util.Optional.empty());
+                Optional.empty());
         return section;
     }
 

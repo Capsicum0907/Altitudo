@@ -92,6 +92,34 @@ public final class AltitudoConfig {
                     "multiplies that. Raise it and watch chunk generation time.")
             .defineInRange("deepOreBonus", 4.5, 1.0, 16.0);
 
+    public static final ModConfigSpec.BooleanValue EXTEND_NETHER = BUILDER
+            .comment("Extend the Nether as well.",
+                    "SWL, the mod this replaces, raised only the build limit there: the roof",
+                    "stayed at 127 and nothing new was generated, so the gain was somewhere to",
+                    "put blocks on top of the lid.",
+                    "",
+                    "The lava sea gets deeper because the floor moves down under it; its",
+                    "surface stays at vanilla's 32, which is not a setting here because twelve",
+                    "surface rules place the shore at absolute heights around it.")
+            .define("extendNether", true);
+
+    public static final ModConfigSpec.IntValue NETHER_MIN_Y = BUILDER
+            .comment("Lowest block the Nether can hold. Vanilla is 0.",
+                    "Everything below the lava sea's surface at 32 fills with lava, so this is",
+                    "also how deep the sea gets: -128 makes it 160 deep instead of 32.")
+            .defineInRange("netherMinY", -128, LIMIT_MIN_Y, LIMIT_MAX_Y);
+
+    public static final ModConfigSpec.IntValue NETHER_HEIGHT = BUILDER
+            .comment("How many blocks of the Nether are generated. Vanilla is 128.",
+                    "The bedrock roof sits at the top of this, not at the top of the box, and",
+                    "so does the ceiling portals may be placed against.")
+            .defineInRange("netherHeight", 1024, SECTION, LIMIT_HEIGHT);
+
+    public static final ModConfigSpec.IntValue NETHER_ROOF_GAP = BUILDER
+            .comment("Empty space kept above the bedrock roof, to build in. Vanilla is 128.",
+                    "The box is netherHeight plus this.")
+            .defineInRange("netherRoofGap", 128, 0, LIMIT_HEIGHT);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private AltitudoConfig() {

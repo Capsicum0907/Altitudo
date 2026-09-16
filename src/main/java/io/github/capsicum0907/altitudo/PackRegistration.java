@@ -40,8 +40,12 @@ public final class PackRegistration {
         }
 
         Dimensions target;
+        java.util.Optional<Dimensions> nether;
         try {
             target = Dimensions.fromConfig();
+            nether = AltitudoConfig.EXTEND_NETHER.get()
+                    ? Optional.of(Dimensions.netherFromConfig())
+                    : Optional.empty();
         } catch (IllegalStateException e) {
             // Refusing to register is the loud failure: worlds generate at vanilla
             // height and the log says why. Registering a pack built from values the
@@ -74,13 +78,13 @@ public final class PackRegistration {
                 new Pack.ResourcesSupplier() {
                     @Override
                     public net.minecraft.server.packs.PackResources openPrimary(PackLocationInfo info) {
-                        return new GeneratedPack(info, target);
+                        return new GeneratedPack(info, target, nether);
                     }
 
                     @Override
                     public net.minecraft.server.packs.PackResources openFull(
                             PackLocationInfo info, Pack.Metadata meta) {
-                        return new GeneratedPack(info, target);
+                        return new GeneratedPack(info, target, nether);
                     }
                 },
                 metadata,

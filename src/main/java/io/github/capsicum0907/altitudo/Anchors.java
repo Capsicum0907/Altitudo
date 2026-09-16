@@ -124,7 +124,7 @@ public final class Anchors {
         } else if (moved == 0) {
             LOGGER.warn("Altitudo moved no cave anchors. The density functions are not the"
                     + " ones this was written against; below y={} there will be voids but no"
-                    + " cave systems.", Dimensions.VANILLA.minY());
+                    + " cave systems.", Dimensions.VANILLA_OVERWORLD.minY());
         } else {
             LOGGER.info("Altitudo moved {} cave anchors and handed {} dimension(s)"
                     + " back to the aquifer below y={}.",
