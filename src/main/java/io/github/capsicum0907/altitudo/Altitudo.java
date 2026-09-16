@@ -31,6 +31,8 @@ public class Altitudo {
         // earlier counts zero and warns about nothing.
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 (net.neoforged.neoforge.event.server.ServerAboutToStartEvent e) -> Anchors.report());
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                (net.neoforged.neoforge.event.level.LevelEvent.Save e) -> OreBands.report());
 
         LOGGER.info("Altitudo {} loaded.", modContainer.getModInfo().getVersion());
     }

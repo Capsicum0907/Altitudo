@@ -55,6 +55,35 @@ public final class AltitudoConfig {
                     "Turn this off when another mod supplies the terrain's shape.")
             .define("extendCaves", true);
 
+    public static final ModConfigSpec.BooleanValue FOLLOW_ORES = BUILDER
+            .comment("Carry the ore bands into the space the world gained.",
+                    "Vanilla writes most of them at absolute heights, so without this the",
+                    "added depth is bare stone - the failure the mod this replaces shipped",
+                    "with, and the quiet kind: nothing reports it but the digging.",
+                    "",
+                    "Other mods' ores come along, because this works on where a placement",
+                    "landed rather than on a list of features it would have to know.")
+            .define("followOres", true);
+
+    public static final ModConfigSpec.IntValue ORE_ANCHOR = BUILDER
+            .comment("At and above this height nothing is moved. Below it, vanilla's range",
+                    "down to -64 is spread across the range down to minY.",
+                    "Keep this at or below sea level, or ore bands that belong to the",
+                    "surface will be dragged underground.")
+            .defineInRange("oreAnchor", 0, LIMIT_MIN_Y, LIMIT_MAX_Y);
+
+    public static final ModConfigSpec.BooleanValue KEEP_ORE_DENSITY = BUILDER
+            .comment("Place as many more as the band got longer.",
+                    "Off, the same veins are spread over a much taller world and the ore is",
+                    "thinner everywhere - stretching alone makes it worse, not better.")
+            .define("keepOreDensity", true);
+
+    public static final ModConfigSpec.DoubleValue DEEP_ORE_BONUS = BUILDER
+            .comment("How much richer the floor is than the anchor. 1.0 is even.",
+                    "This is the reason to dig deeper rather than to stay where the ore",
+                    "already was; it is a choice about play, not arithmetic.")
+            .defineInRange("deepOreBonus", 3.0, 1.0, 64.0);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private AltitudoConfig() {
