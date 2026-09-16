@@ -46,6 +46,15 @@ public final class AltitudoConfig {
                     "supplies the ground's shape. Until then, leave it at 63.")
             .defineInRange("seaLevel", 63, LIMIT_MIN_Y, LIMIT_MAX_Y);
 
+    public static final ModConfigSpec.BooleanValue EXTEND_CAVES = BUILDER
+            .comment("Carry the bounds that decide where caves may exist down to the new",
+                    "floor. Vanilla anchors them near -64, so without this the space below",
+                    "is shaped by 3D noise alone: large shapeless voids rather than cave",
+                    "systems, and every one of them flooded with lava.",
+                    "",
+                    "Turn this off when another mod supplies the terrain's shape.")
+            .define("extendCaves", true);
+
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private AltitudoConfig() {

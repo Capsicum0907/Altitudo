@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "io.github.capsicum0907.altitudo.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "RangeChoiceMixin",
+    "YClampedGradientMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -26,6 +26,11 @@ public class Altitudo {
         modContainer.registerConfig(ModConfig.Type.STARTUP, AltitudoConfig.SPEC);
 
         modEventBus.addListener(PackRegistration::onAddPackFinders);
+        // On the game bus and this late on purpose: the anchors are moved while the
+        // data pack registries load, which is after every mod-bus phase. Reporting
+        // earlier counts zero and warns about nothing.
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                (net.neoforged.neoforge.event.server.ServerAboutToStartEvent e) -> Anchors.report());
 
         LOGGER.info("Altitudo {} loaded.", modContainer.getModInfo().getVersion());
     }
