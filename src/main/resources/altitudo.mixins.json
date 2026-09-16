@@ -4,6 +4,7 @@
   "package": "io.github.capsicum0907.altitudo.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "FluidPickerMixin",
     "RangeChoiceMixin",
     "YClampedGradientMixin"
   ],

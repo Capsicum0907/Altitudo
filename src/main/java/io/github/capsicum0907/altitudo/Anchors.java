@@ -35,9 +35,24 @@ public final class Anchors {
     private static final double NOODLE_MIN = -60.0;
     private static final double NOODLE_MAX = 321.0;
 
+    /**
+     * Vanilla's own boundary for "deep", kept as it is. Only what the fallback at this
+     * level calls itself is changed, not where it starts.
+     */
+    public static final int DEEP_FALLBACK_LEVEL = -54;
+
     private static final AtomicInteger MOVED = new AtomicInteger();
+    private static final AtomicInteger PICKERS = new AtomicInteger();
 
     private Anchors() {
+    }
+
+    public static boolean extendingCaves() {
+        return enabled();
+    }
+
+    public static void noteFluidPicker() {
+        PICKERS.incrementAndGet();
     }
 
     private static boolean enabled() {
@@ -111,7 +126,9 @@ public final class Anchors {
                     + " ones this was written against; below y={} there will be voids but no"
                     + " cave systems.", Dimensions.VANILLA.minY());
         } else {
-            LOGGER.info("Altitudo moved {} cave anchors.", moved);
+            LOGGER.info("Altitudo moved {} cave anchors and handed {} dimension(s)"
+                    + " back to the aquifer below y={}.",
+                    moved, PICKERS.get(), DEEP_FALLBACK_LEVEL);
         }
     }
 }
