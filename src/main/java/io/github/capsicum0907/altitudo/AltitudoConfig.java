@@ -61,23 +61,31 @@ public final class AltitudoConfig {
                     "added depth is bare stone - the failure the mod this replaces shipped",
                     "with, and the quiet kind: nothing reports it but the digging.",
                     "",
-                    "Other mods' ores come along, because this works on where a placement",
-                    "landed rather than on a list of features it would have to know.")
+                    "Other mods' ores come along, because an ore is recognised by being",
+                    "configured as one, not by a list of ids this would have to know.")
             .define("followOres", true);
 
     public static final ModConfigSpec.IntValue ORE_ANCHOR = BUILDER
-            .comment("At and above this height nothing is moved. Below it, vanilla's band",
+            .comment("At and above this height nothing is added. Below it, vanilla's slice",
                     "from -64 up to here is repeated on the way down to minY.",
                     "Keep this at or below sea level, or bands that belong to the surface",
-                    "will be dragged underground.")
+                    "will be copied underground.",
+                    "",
+                    "The deep is a copy of that slice, so what vanilla does not put below",
+                    "this height is not down there either: at 0 that means no coal at all,",
+                    "and copper only in a short stripe once per repeat.")
             .defineInRange("oreAnchor", 0, LIMIT_MIN_Y, LIMIT_MAX_Y);
 
     public static final ModConfigSpec.DoubleValue DEEP_ORE_BONUS = BUILDER
-            .comment("How much more often a placement lands in the deepest repeat of its",
-                    "band than in the shallowest. 1.0 spreads them evenly.",
-                    "Nothing extra is placed - this only decides how far down it goes,",
-                    "which is the reason to dig rather than to stay where ore already was.")
-            .defineInRange("deepOreBonus", 3.0, 1.0, 64.0);
+            .comment("How dense ore is at the floor, as a multiple of vanilla. 1.0 repeats",
+                    "vanilla's density unchanged all the way down; the rise from the top of",
+                    "the deep to the floor is linear.",
+                    "",
+                    "Nothing is taken from the vanilla range to pay for it - every vein down",
+                    "here is an addition. So this is also the bill: filling the world at",
+                    "vanilla density already costs about one vein per repeat, and this",
+                    "multiplies that. Raise it and watch chunk generation time.")
+            .defineInRange("deepOreBonus", 3.0, 1.0, 16.0);
 
     public static final ModConfigSpec SPEC = BUILDER.build();
 
