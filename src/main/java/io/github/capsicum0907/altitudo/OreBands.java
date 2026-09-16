@@ -31,6 +31,10 @@ import net.minecraft.world.level.levelgen.placement.PlacementContext;
  * z - and the repeats are <em>added</em> on top of it. So the vanilla range keeps
  * vanilla's density exactly, and every repeat below it gets at least as much.
  * <p>
+ * A repeat is a copy of that slice and of nothing else, so the deep reads as
+ * vanilla's deepest layer does, only denser. What is below the slice in vanilla -
+ * the tails of the redstone and diamond bands - stays where vanilla put it.
+ * <p>
  * ⚠ The two designs that came before both failed on this. Stretching one band
  * across the whole depth, and then repeating a band and choosing one repeat at
  * random, are the same mistake twice: they move a fixed number of placements over
@@ -146,7 +150,12 @@ public final class OreBands {
         ORES.incrementAndGet();
 
         int anchor = AltitudoConfig.ORE_ANCHOR.get();
-        if (sampled >= anchor) {
+        // ⚠ Only the slice itself is repeated, not everything that landed under it.
+        // Several vanilla bands reach well below the slice - redstone to -96, diamond
+        // to -144 - and repeating those too stacks their tails into every repeat.
+        // Measured at the floor that made redstone 4.4x vanilla against copper's 1.8x,
+        // visibly a deep made of redstone. The slice is what a copy of the slice means.
+        if (sampled >= anchor || sampled < Dimensions.VANILLA.minY()) {
             return out;
         }
         int band = anchor - Dimensions.VANILLA.minY();

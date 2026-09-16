@@ -90,7 +90,7 @@ public final class AltitudoConfig {
                     "here is an addition. So this is also the bill: filling the world at",
                     "vanilla density already costs about one vein per repeat, and this",
                     "multiplies that. Raise it and watch chunk generation time.")
-            .defineInRange("deepOreBonus", 3.0, 1.0, 16.0);
+            .defineInRange("deepOreBonus", 4.5, 1.0, 16.0);
 
     public static final ModConfigSpec SPEC = BUILDER.build();
 
