@@ -26,13 +26,17 @@ import net.minecraft.world.level.levelgen.placement.PlacementContext;
  * to know its caller is in the wrong place. Carvers and structures reach heights
  * by their own route and are left alone here.
  * <p>
- * Geodes, dungeons and lichen use {@code height_range} as much as ores do, so
- * anything that is not an ore leaves here exactly as vanilla sampled it. Only ores
- * gain positions, and only below the anchor.
+ * Two separate things happen here.
  * <p>
- * An ore's band is sampled against vanilla's extent rather than this world's, so a
- * band written as {@code above_bottom} stays where vanilla drew it instead of
- * sliding down to the new bedrock. See {@code OreBands.vanillaExtent}.
+ * Every band is sampled against vanilla's extent rather than this world's, so one
+ * written as {@code above_bottom} stays where vanilla drew it instead of sliding
+ * down to the new bedrock. That is not an ore question: geodes, dungeons and
+ * lichen are anchored that way too, and measured at zero in -64..0 without it,
+ * spread thin over two thousand blocks instead. It holds whether or not the mod is
+ * following ores, because it is the box that moved, not the generation.
+ * <p>
+ * Then, and only for ores, positions are added in the repeats below. Everything
+ * else leaves with exactly one position, as vanilla gave it.
  */
 @Mixin(HeightRangePlacement.class)
 public abstract class HeightRangePlacementMixin {
@@ -43,10 +47,14 @@ public abstract class HeightRangePlacementMixin {
     @Inject(method = "getPositions", at = @At("HEAD"), cancellable = true)
     private void altitudo$carryDown(PlacementContext context, RandomSource random, BlockPos pos,
             CallbackInfoReturnable<Stream<BlockPos>> callback) {
-        if (!OreBands.enabled() || !OreBands.isOre(context)) {
+        if (!OreBands.resized(context)) {
             return;
         }
         int sampled = this.height.sample(random, OreBands.vanillaExtent(context));
+        if (!OreBands.enabled() || !OreBands.isOre(context)) {
+            callback.setReturnValue(Stream.of(pos.atY(sampled)));
+            return;
+        }
         callback.setReturnValue(OreBands.positions(pos, sampled, random).stream());
     }
 }

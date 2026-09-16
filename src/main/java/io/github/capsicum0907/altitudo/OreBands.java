@@ -117,6 +117,23 @@ public final class OreBands {
     }
 
     /**
+     * Whether this is a dimension Altitudo resized.
+     * <p>
+     * ⚠ Asked before touching anything, because the Nether decorates through the
+     * same code and most of its features are anchored relatively too. Pinning those
+     * to the overworld's vanilla extent would move every one of them, and dropping
+     * a repeat of an ore band would put it below the Nether's floor.
+     * <p>
+     * The test is the extent itself rather than the dimension's name, so it answers
+     * for a modded dimension on the same terms.
+     */
+    public static boolean resized(PlacementContext context) {
+        Dimensions configured = Dimensions.fromConfig();
+        return context.getMinGenY() == configured.minY()
+                && context.getGenDepth() == configured.height();
+    }
+
+    /**
      * Every position this placement should produce: vanilla's, then one set per
      * repeat below it.
      *

@@ -62,7 +62,12 @@ public final class AltitudoConfig {
                     "with, and the quiet kind: nothing reports it but the digging.",
                     "",
                     "Other mods' ores come along, because an ore is recognised by being",
-                    "configured as one, not by a list of ids this would have to know.")
+                    "configured as one, not by a list of ids this would have to know.",
+                    "",
+                    "Only the repeating is switched off here. Bands written relative to the",
+                    "floor - geodes, dungeons, diamond - are put back where vanilla drew",
+                    "them either way, because that is the box having moved rather than",
+                    "anything to do with ore.")
             .define("followOres", true);
 
     public static final ModConfigSpec.IntValue ORE_ANCHOR = BUILDER
