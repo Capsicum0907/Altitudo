@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import io.github.capsicum0907.altitudo.OreBands;
+import io.github.capsicum0907.altitudo.Bands;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
@@ -30,13 +30,15 @@ import net.minecraft.world.level.levelgen.placement.PlacementContext;
  * <p>
  * Every band is sampled against vanilla's extent rather than this world's, so one
  * written as {@code above_bottom} stays where vanilla drew it instead of sliding
- * down to the new bedrock. That is not an ore question: geodes, dungeons and
- * lichen are anchored that way too, and measured at zero in -64..0 without it,
- * spread thin over two thousand blocks instead. It holds whether or not the mod is
- * following ores, because it is the box that moved, not the generation.
+ * to the new bedrock. That is not an ore question: geodes, dungeons and lichen are
+ * anchored that way too, and measured at zero in -64..0 without it, spread thin
+ * over two thousand blocks instead. It holds whether or not the mod is following
+ * ores, because it is the box that moved, not the generation.
  * <p>
- * Then, and only for ores, positions are added in the repeats below. Everything
- * else leaves with exactly one position, as vanilla gave it.
+ * Then copies are added, for whatever the dimension's plan allows - ores only in
+ * the overworld, where the rest belongs to a surface that did not move; everything
+ * in the Nether, which has no surface and where vanilla's own
+ * {@code count_on_every_layer} features already scale with the height.
  */
 @Mixin(HeightRangePlacement.class)
 public abstract class HeightRangePlacementMixin {
@@ -47,14 +49,15 @@ public abstract class HeightRangePlacementMixin {
     @Inject(method = "getPositions", at = @At("HEAD"), cancellable = true)
     private void altitudo$carryDown(PlacementContext context, RandomSource random, BlockPos pos,
             CallbackInfoReturnable<Stream<BlockPos>> callback) {
-        if (!OreBands.resized(context)) {
+        Bands.Plan plan = Bands.planFor(context);
+        if (plan == null) {
             return;
         }
-        int sampled = this.height.sample(random, OreBands.vanillaExtent(context));
-        if (!OreBands.enabled() || !OreBands.isOre(context)) {
+        int sampled = this.height.sample(random, Bands.vanillaExtent(context, plan));
+        if (!Bands.enabled() || (plan.oresOnly() && !Bands.isOre(context))) {
             callback.setReturnValue(Stream.of(pos.atY(sampled)));
             return;
         }
-        callback.setReturnValue(OreBands.positions(pos, sampled, random).stream());
+        callback.setReturnValue(Bands.positions(plan, pos, sampled, random).stream());
     }
 }
