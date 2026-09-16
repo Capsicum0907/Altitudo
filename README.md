@@ -1,11 +1,9 @@
 # Altitudo
 
 A taller world, with the generation following it up and down.
-*Altitudo* is the Latin for both height and depth. It is one word for the distance up and the distance down, which is the pair of numbers this mod exists to move.
 
-> **Status: scaffold only.** The mod loads and does nothing.
-
-## Target
+*Altitudo* is the Latin for both height and depth. One word for the distance up and
+the distance down, which is the pair of numbers this mod exists to move.
 
 | | |
 |---|---|
@@ -13,51 +11,60 @@ A taller world, with the generation following it up and down.
 | Loader | NeoForge 21.1.248 |
 | Java | 21 |
 
-1.21.1 is the version large tech mods stayed on, so it is where this mod is useful.
+## What it does
 
-## Design
+The overworld runs from **-2032 to 2031** and the Nether from **-128 to 1023**, and
+the things that make a world worth digging follow them:
 
-A world's height lives in two places, and only their intersection is real:
+- **Caves** reach the new floor, instead of the space below -64 being shapeless
+  lava-filled voids.
+- **Ore** keeps vanilla's density at every depth, and gets richer further down.
+- **The Nether's roof** rises with the terrain, with the same 128 blocks of building
+  space above it that vanilla leaves.
+- **The lava sea** is as deep as the floor is low - 160 blocks instead of 32.
 
-```java
-// WorldGenerationContext
-this.minY   = Math.max(level.getMinBuildHeight(), generator.getMinY());
-this.height = Math.min(level.getHeight(), generator.getGenDepth());
-```
+Other mods' ores come along, because an ore is recognised by being configured as
+one rather than by a list of ids. A mod that wants to be left alone can say so:
+[docs/for-mod-authors.md](docs/for-mod-authors.md).
 
-The box you can build in comes from `dimension_type`. The range terrain is generated
-into comes from `noise_settings`. The Nether keeps them deliberately apart — a box of
-256 over 128 of terrain — and the 128 left over is the space above the bedrock roof.
+## What it does not do
 
-So changing a world's height is a few numbers. Making the world worth the space is
-the whole job, and it splits by what is countable:
+Altitudo keeps Minecraft coherent in a taller world. It does not add content, and it
+does not reshape terrain. If the added space should also be *more interesting* than
+vanilla - new structures, new ores, a different landscape - that is another mod's
+job, not this one's.
 
-**The dimensions and the shape of the terrain** are finitely many known files —
-`dimension_type`, `noise_settings`, and the density functions the two of them
-reference. Those are generated: one setting per dimension, and the three to five
-places that have to agree are derived from it rather than written out. The pack is
-built in memory, so any depth is a value rather than one of six builds, and it
-rewrites the numbers it needs inside vanilla's files instead of shipping copies of
-them that go stale a version later.
+## Settings
 
-**The bands written in absolute coordinates** are unboundedly many unknown ones.
-Vanilla has 54 placed features anchored to a fixed Y, and every other mod that adds
-an ore has its own. There is no list of them to hold, so Altitudo holds none: it
-remaps where a band resolves to, at the one point every `height_range` placement
-passes through. Nobody's feature is named, so everybody's travels.
+`config/altitudo-startup.toml`, read before any world exists. A world's height is
+fixed when it is created, so changing these needs a restart and only affects new
+worlds.
 
-That point is `HeightRangePlacement`, not `VerticalAnchor$Absolute#resolveY`. The
-latter looks like the better place — one method, every absolute anchor in the game —
-but surface rules resolve through it too, and their absolute coordinates describe
-where the ground is, not how deep a vein sits. A function that has to know its caller
-is in the wrong place.
+| | default | vanilla | |
+|---|---:|---:|---|
+| `minY` | -2032 | -64 | Lowest block of the overworld |
+| `height` | 4064 | 384 | Overworld height |
+| `seaLevel` | 63 | 63 | Ocean surface. Moves the water, not the land |
+| `extendCaves` | true | | Carry the cave bounds down to `minY` |
+| `followOres` | true | | Repeat vanilla's bands into the added space |
+| `oreAnchor` | 0 | | Nothing is added at or above this height |
+| `deepOreBonus` | 4.5 | 1.0 | Ore density at `minY`, as a multiple of vanilla |
+| `extendNether` | true | | Extend the Nether as well |
+| `netherMinY` | -128 | 0 | Lowest block of the Nether; also the lava sea's depth |
+| `netherHeight` | 1024 | 128 | How much of the Nether is generated |
+| `netherRoofGap` | 128 | 128 | Empty space kept above the Nether's roof |
 
-Two levers, not one. Widening a band spreads the same number of veins over more
-space, which thins it; the count has to scale with the range before any of this is
-break-even, and only then can depth pay better than the surface.
+`minY`, `height` and `netherRoofGap` are multiples of 16; `minY + height` may not
+exceed 2032. Anything the game would reject is refused at startup with a line in the
+log, and the world generates at vanilla height rather than crashing halfway through
+creation.
 
-Because the failure is silent — no error, no warning, just stone — the y-band census
-is a test, not something you go and dig for.
+## Documentation
+
+- [How it works](docs/how-it-works.md) - the mechanism, and why each piece is where
+  it is
+- [For mod authors](docs/for-mod-authors.md) - what Altitudo touches, and how to opt
+  out of it
 
 ## Build
 
@@ -65,16 +72,9 @@ is a test, not something you go and dig for.
 run.bat                   # compile and launch a dev client - double-clickable
 gradlew build             # produce the jar
 gradlew runGameTestServer # run every game test, headless, then exit
-gradlew runData           # regenerate models, recipes and language
 ```
 
 `JAVA_HOME` must point at a JDK 21, or `java` must be on `PATH`.
-
-## Roadmap
-
-- [x] **0** — scaffold; the mod loads
-- [ ] **1** — the feature above, in a form that can be watched
-- [ ] **2** — checked by game tests rather than by eye
 
 ## License
 

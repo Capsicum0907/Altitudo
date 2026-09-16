@@ -32,23 +32,10 @@ import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.repository.ServerPacksSource;
 import net.minecraft.server.packs.resources.IoSupplier;
 
-/**
- * A data pack that is computed rather than stored.
- * <p>
- * {@link PackResources#getResource} only has to return an {@link InputStream}. It
- * never has to be a file, which is what lets the depth be any number the config
- * says instead of one of a handful of prebuilt packs - the thing the mod this
- * replaces could not do, and the reason it shipped six jars.
- * <p>
- * Each entry names the file, the vanilla extent to read it as, and the extent to
- * write. A dimension this mod is not extending contributes no entries, so leaving
- * one alone needs no branch anywhere else.
- */
 public final class GeneratedPack implements PackResources {
     private static final Logger LOGGER = LogUtils.getLogger();
     private static final String NAMESPACE = "minecraft";
 
-    /** One generated file: what to read, how to read it, and what to make it say. */
     private record Entry(ResourceLocation id, Dimensions vanilla, Dimensions target, Transform how) {
     }
 
@@ -67,14 +54,6 @@ public final class GeneratedPack implements PackResources {
         nether.ifPresent(target -> add("the_nether", "nether", Dimensions.VANILLA_NETHER, target));
     }
 
-    /**
-     * Adds the two files one dimension needs.
-     * <p>
-     * ⚠ The two names differ for the nether: its dimension type is
-     * {@code the_nether} and its noise settings are {@code nether}. Registry file
-     * names are not one spelling per dimension, so both are passed rather than one
-     * derived from the other.
-     */
     private void add(String dimensionType, String noiseSettings, Dimensions vanilla, Dimensions target) {
         this.entries.add(new Entry(
                 ResourceLocation.fromNamespaceAndPath(NAMESPACE, "dimension_type/" + dimensionType + ".json"),
@@ -109,18 +88,7 @@ public final class GeneratedPack implements PackResources {
         return null;
     }
 
-    /**
-     * Reads what vanilla ships for this file and changes the numbers in it.
-     * <p>
-     * The source is vanilla's own pack rather than the one below this in the stack,
-     * because a pack cannot see past itself. Another data pack that reshapes terrain
-     * therefore wins or loses by pack order, the same as it would against any other
-     * pack - it is not silently merged.
-     */
     private byte[] build(Entry entry) {
-        // ServerPacksSource#createVanillaPackSource is marked @VisibleForTesting.
-        // It is the only public way to read the built-in data without a running
-        // server; noted here so the reason is on record if it ever moves.
         try (VanillaPackResources vanilla = ServerPacksSource.createVanillaPackSource()) {
             IoSupplier<InputStream> source = vanilla.getResource(PackType.SERVER_DATA, entry.id());
             if (source == null) {
@@ -147,11 +115,8 @@ public final class GeneratedPack implements PackResources {
         if (packType != PackType.SERVER_DATA || !NAMESPACE.equals(namespace)) {
             return;
         }
-        // The separator is load-bearing. Registries are listed by their directory,
-        // and a bare prefix test answers "worldgen/noise" with the file that lives
-        // in "worldgen/noise_settings" - which is then read as a noise parameter
-        // named "settings/overworld" and fails on a field it was never going to
-        // have. Valid JSON handed to the wrong registry.
+        // Registries are listed by directory: without the separator,
+        // "worldgen/noise" also answers with worldgen/noise_settings.
         String prefix = path.endsWith("/") ? path : path + "/";
         for (Entry entry : this.entries) {
             if (entry.id().getPath().startsWith(prefix)) {

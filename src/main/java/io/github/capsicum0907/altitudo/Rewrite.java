@@ -4,32 +4,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-/**
- * Rewrites the numbers inside vanilla's own worldgen files rather than shipping
- * copies of them.
- * <p>
- * A copy of {@code noise_settings/overworld.json} is 38 KB of terrain shaping that
- * has nothing to do with this mod's subject. Carrying it means inheriting every
- * future change to it as a silent divergence, and overwriting whatever another
- * data pack did to it. Reading what is already there and changing a few numbers
- * does not.
- * <p>
- * Every rewrite is counted. A transform that matches nothing still produces valid
- * JSON and a world that generates, so "found no match" has to be an error rather
- * than a quiet pass-through - otherwise the failure shows up hours later as a
- * world with no caves.
- * <p>
- * ⚠ The count is not a number typed here. The overworld carries the slide pair
- * twice and the nether once, so a literal would have to be different per file and
- * would be exactly the kind of value this class exists to keep out of the code.
- * What is required is structural: at least one floor slide and at least one
- * ceiling slide, matched by the values vanilla computed for that dimension.
- */
 public final class Rewrite {
     private Rewrite() {
     }
 
-    /** {@code dimension_type}: the box the world is allowed to fill. */
     public static JsonObject dimensionType(JsonObject source, Dimensions vanilla, Dimensions target) {
         JsonObject out = source.deepCopy();
         replaceInt(out, "min_y", target.minY());
@@ -38,14 +16,6 @@ public final class Rewrite {
         return out;
     }
 
-    /**
-     * {@code noise_settings}: the range terrain is generated into, the fluid line,
-     * and the two slides that decide where rock stops.
-     * <p>
-     * The sea level is only written when it actually differs, because the nether's
-     * is not ours to move: twelve surface rules place the lava shore at absolute
-     * heights between 30 and 35, and they would stay behind.
-     */
     public static JsonObject noiseSettings(JsonObject source, Dimensions vanilla, Dimensions target) {
         JsonObject out = source.deepCopy();
 
@@ -70,7 +40,6 @@ public final class Rewrite {
         return out;
     }
 
-    /** How many of each kind were changed, so a missing kind can be told from a missing file. */
     private record Slides(int floor, int ceiling) {
         Slides plus(Slides other) {
             return new Slides(this.floor + other.floor, this.ceiling + other.ceiling);
@@ -79,16 +48,6 @@ public final class Rewrite {
         static final Slides NONE = new Slides(0, 0);
     }
 
-    /**
-     * Moves the floor and ceiling slides to the new extent.
-     * <p>
-     * Vanilla writes them as literals - the overworld's {@code (-64, -40)} and
-     * {@code (240, 256)}, the nether's {@code (-8, 24)} and {@code (104, 128)} -
-     * but each is its dimension's own {@code minY} and {@code minY + height} with
-     * fixed offsets. Matching on the pair vanilla would have computed is what makes
-     * the requirement above meaningful: anything else in the file that happens to
-     * be a gradient is left alone.
-     */
     private static Slides retargetSlides(JsonElement element, Dimensions vanilla, Dimensions target) {
         if (element.isJsonObject()) {
             JsonObject object = element.getAsJsonObject();
