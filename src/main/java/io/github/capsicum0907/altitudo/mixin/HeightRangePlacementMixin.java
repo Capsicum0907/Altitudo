@@ -1,6 +1,5 @@
 package io.github.capsicum0907.altitudo.mixin;
 
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.spongepowered.asm.mixin.Final;
@@ -27,8 +26,11 @@ import net.minecraft.world.level.levelgen.placement.PlacementContext;
  * to know its caller is in the wrong place. Carvers and structures reach heights
  * by their own route and are left alone here.
  * <p>
- * Every mod's ores come through here as well, which is the point - there is no
- * list of them to hold.
+ * ⚠ The same test applies to this point, and it is why nothing is duplicated
+ * here. Geodes, dungeons and lichen use {@code height_range} as much as ores do,
+ * and from here they are indistinguishable - an earlier version emitted a copy per
+ * band length and one of those features reached into a chunk that did not exist
+ * yet. Moving a position is safe for all of them; making more of them is not.
  */
 @Mixin(HeightRangePlacement.class)
 public abstract class HeightRangePlacementMixin {
@@ -43,18 +45,6 @@ public abstract class HeightRangePlacementMixin {
             return;
         }
         int sampled = this.height.sample(random, context);
-        int moved = OreBands.stretch(sampled);
-        int copies = OreBands.copies(moved, random);
-        OreBands.note(sampled, moved, copies);
-
-        if (copies == 1 && moved == sampled) {
-            callback.setReturnValue(Stream.of(pos.atY(sampled)));
-            return;
-        }
-        // Each copy samples again, so they spread through the stretched band instead
-        // of stacking into one column - the band is what got longer, not the vein.
-        callback.setReturnValue(IntStream.range(0, copies)
-                .mapToObj(i -> pos.atY(i == 0 ? moved
-                        : OreBands.stretch(this.height.sample(random, context)))));
+        callback.setReturnValue(Stream.of(pos.atY(OreBands.place(sampled, random))));
     }
 }

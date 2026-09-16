@@ -66,22 +66,17 @@ public final class AltitudoConfig {
             .define("followOres", true);
 
     public static final ModConfigSpec.IntValue ORE_ANCHOR = BUILDER
-            .comment("At and above this height nothing is moved. Below it, vanilla's range",
-                    "down to -64 is spread across the range down to minY.",
-                    "Keep this at or below sea level, or ore bands that belong to the",
-                    "surface will be dragged underground.")
+            .comment("At and above this height nothing is moved. Below it, vanilla's band",
+                    "from -64 up to here is repeated on the way down to minY.",
+                    "Keep this at or below sea level, or bands that belong to the surface",
+                    "will be dragged underground.")
             .defineInRange("oreAnchor", 0, LIMIT_MIN_Y, LIMIT_MAX_Y);
 
-    public static final ModConfigSpec.BooleanValue KEEP_ORE_DENSITY = BUILDER
-            .comment("Place as many more as the band got longer.",
-                    "Off, the same veins are spread over a much taller world and the ore is",
-                    "thinner everywhere - stretching alone makes it worse, not better.")
-            .define("keepOreDensity", true);
-
     public static final ModConfigSpec.DoubleValue DEEP_ORE_BONUS = BUILDER
-            .comment("How much richer the floor is than the anchor. 1.0 is even.",
-                    "This is the reason to dig deeper rather than to stay where the ore",
-                    "already was; it is a choice about play, not arithmetic.")
+            .comment("How much more often a placement lands in the deepest repeat of its",
+                    "band than in the shallowest. 1.0 spreads them evenly.",
+                    "Nothing extra is placed - this only decides how far down it goes,",
+                    "which is the reason to dig rather than to stay where ore already was.")
             .defineInRange("deepOreBonus", 3.0, 1.0, 64.0);
 
     public static final ModConfigSpec SPEC = BUILDER.build();

@@ -6,7 +6,6 @@ import com.mojang.logging.LogUtils;
 
 import org.slf4j.Logger;
 
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 
 /**
@@ -14,25 +13,34 @@ import net.minecraft.util.RandomSource;
  * <p>
  * Vanilla writes where an ore may appear as a height, and most of those heights
  * are absolute: copper at -16..112, gold at -64..32, diamond relative to a floor
- * that used to be at -64. A world that is thirty times deeper does not move any of
- * them, so the added space is stone. This is the half of the mod that is not the
+ * that used to be at -64. A world thirty times deeper does not move any of them,
+ * so the added space is stone. This is the half of the mod that is not the
  * dimensions.
  * <p>
- * It is applied to the height a placement resolved to rather than to the data that
- * named it, because the data cannot be enumerated: every mod that adds an ore has
- * its own, under ids this cannot know. Catching the value on the way through
- * reaches all of them without naming any.
+ * It works on the height a placement resolved to, not on the data that named it,
+ * because the data cannot be enumerated: every mod that adds an ore has its own,
+ * under ids this cannot know. Catching the value on the way through reaches all of
+ * them without naming any.
+ *
+ * <h2>⚠ Repeated, not stretched</h2>
+ * The first attempt spread vanilla's band across the whole depth and then placed
+ * as many more as it had lengthened, to keep the ore from thinning. Both halves
+ * were wrong. Thirty-one copies of one position all landed in the same column,
+ * because only the height was resampled - visibly a vertical stripe of ore two
+ * thousand blocks tall. And this point cannot tell an ore from a geode or a
+ * dungeon, so everything that uses {@code height_range} was multiplied too, until
+ * one of them reached into a chunk that did not exist yet and the server stopped.
  * <p>
- * <b>Two levers, not one.</b> Stretching a band without changing how many are
- * placed spreads the same veins over more rock, which is thinner ore, not deeper
- * ore. So the same place that moves a position also decides how many to emit -
- * one factor to undo the thinning, and one to make depth actually pay.
+ * So: a placement is moved, never duplicated. One position in, one position out.
+ * Vanilla's band is repeated down the world instead of being stretched across it,
+ * which keeps the ore as dense as vanilla made it without placing anything extra,
+ * and leaves depth to be expressed as which repeat gets chosen.
  */
 public final class OreBands {
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final AtomicLong STRETCHED = new AtomicLong();
-    private static final AtomicLong EMITTED = new AtomicLong();
+    private static final AtomicLong MOVED = new AtomicLong();
+    private static final AtomicLong KEPT = new AtomicLong();
 
     private OreBands() {
     }
@@ -46,105 +54,90 @@ public final class OreBands {
     }
 
     /**
-     * Where a height written for vanilla's world lands in this one.
+     * Moves a height into one of the repeats of vanilla's band below it.
      * <p>
-     * Identity at and above the anchor, so the surface and everything a player sees
-     * without digging is untouched; below it, vanilla's range down to its old floor
-     * is spread across the range down to this one. Piecewise linear and monotone:
-     * an ore that was below another still is.
+     * At and above the anchor nothing moves, so the surface is untouched. Below it
+     * the height keeps its position within vanilla's band and is dropped by a whole
+     * number of band lengths - so an ore that belonged near the bottom of its band
+     * still does, in whichever repeat it landed in.
+     *
+     * @return where this placement should go
      */
-    public static int stretch(int y) {
+    public static int place(int y, RandomSource random) {
         int anchor = AltitudoConfig.ORE_ANCHOR.get();
         if (y >= anchor) {
+            KEPT.incrementAndGet();
             return y;
         }
         int floor = Dimensions.fromConfig().minY();
-        int vanillaFloor = Dimensions.VANILLA.minY();
-        if (floor >= vanillaFloor || anchor <= vanillaFloor) {
+        int band = anchor - Dimensions.VANILLA.minY();
+        if (band <= 0 || floor >= Dimensions.VANILLA.minY()) {
+            KEPT.incrementAndGet();
             return y;
         }
-        double t = (double) (anchor - y) / (anchor - vanillaFloor);
-        return (int) Math.round(anchor + t * (floor - anchor));
-    }
-
-    /** How much longer the band became, and therefore how much thinner it would be. */
-    public static double thinning() {
-        int anchor = AltitudoConfig.ORE_ANCHOR.get();
-        int floor = Dimensions.fromConfig().minY();
-        int vanillaFloor = Dimensions.VANILLA.minY();
-        if (floor >= vanillaFloor || anchor <= vanillaFloor) {
-            return 1.0;
+        int repeats = (anchor - floor) / band;
+        if (repeats <= 1) {
+            KEPT.incrementAndGet();
+            return y;
         }
-        return (double) (anchor - floor) / (anchor - vanillaFloor);
+        int chosen = chooseRepeat(repeats, random);
+        int moved = y - chosen * band;
+        if (moved < floor) {
+            KEPT.incrementAndGet();
+            return y;
+        }
+        if (chosen > 0) {
+            MOVED.incrementAndGet();
+        } else {
+            KEPT.incrementAndGet();
+        }
+        return moved;
     }
 
     /**
-     * How many to place where one was placed before.
-     * <p>
-     * The first factor is arithmetic: the band is this much longer, so this many are
-     * needed to leave the ore as dense as it was. The second is a choice - how much
-     * better the bottom is than the top - and it is the reason to dig rather than to
-     * stay where the ore already was.
-     *
-     * @param y the stretched height, so the reward follows where the ore ended up
+     * Which repeat this one goes to. Even at a bonus of 1; with a higher bonus the
+     * deeper repeats are drawn more often, which is the whole of "deeper is richer"
+     * - no extra ore is placed, it is only placed further down.
      */
-    public static int copies(int y, RandomSource random) {
-        double count = 1.0;
-        if (AltitudoConfig.KEEP_ORE_DENSITY.get()) {
-            count = thinning();
+    private static int chooseRepeat(int repeats, RandomSource random) {
+        double bonus = AltitudoConfig.DEEP_ORE_BONUS.get();
+        if (bonus <= 1.0) {
+            return random.nextInt(repeats);
         }
-        count *= reward(y);
-        int whole = (int) count;
-        // The fractional part is a probability, not a rounding error: a factor of 1.4
-        // has to mean "one, and sometimes a second", or every band lands on the same
-        // integer and the curve disappears.
-        if (random.nextDouble() < count - whole) {
-            whole++;
+        // Weight rises linearly from 1 at the top repeat to bonus at the bottom one.
+        // Drawn by inverting the cumulative weight rather than by building a table,
+        // so the number of repeats costs nothing.
+        double total = repeats * (1.0 + bonus) / 2.0;
+        double pick = random.nextDouble() * total;
+        double step = (bonus - 1.0) / Math.max(repeats - 1, 1);
+        double weight = 1.0;
+        double sum = 0.0;
+        for (int i = 0; i < repeats; i++) {
+            sum += weight;
+            if (pick < sum) {
+                return i;
+            }
+            weight += step;
         }
-        return Math.max(whole, 0);
-    }
-
-    /** 1 at the anchor, rising to the configured multiple at the floor. */
-    private static double reward(int y) {
-        double atFloor = AltitudoConfig.DEEP_ORE_BONUS.get();
-        if (atFloor <= 1.0) {
-            return 1.0;
-        }
-        int anchor = AltitudoConfig.ORE_ANCHOR.get();
-        int floor = Dimensions.fromConfig().minY();
-        if (y >= anchor || floor >= anchor) {
-            return 1.0;
-        }
-        double t = Mth.clamp((double) (anchor - y) / (anchor - floor), 0.0, 1.0);
-        return 1.0 + t * (atFloor - 1.0);
-    }
-
-    public static void note(int before, int after, int copies) {
-        if (before != after) {
-            STRETCHED.incrementAndGet();
-        }
-        EMITTED.addAndGet(copies);
+        return repeats - 1;
     }
 
     /**
-     * Zero stretched means every ore is still sitting where vanilla put it and the
-     * added depth is bare stone - a world that generates perfectly well and has
-     * nothing in it.
+     * Zero moved means every ore is still where vanilla put it and the added depth
+     * is bare stone - a world that generates perfectly well and has nothing in it.
      */
     public static void report() {
         if (!enabled()) {
             LOGGER.info("Altitudo is not following ore bands (followOres = false).");
             return;
         }
-        long stretched = STRETCHED.get();
-        if (stretched == 0) {
-            LOGGER.warn("Altitudo stretched no ore band. Everything below y={} is bare stone.",
+        long moved = MOVED.get();
+        if (moved == 0) {
+            LOGGER.warn("Altitudo moved no ore placement. Everything below y={} is bare stone.",
                     Dimensions.VANILLA.minY());
         } else {
-            LOGGER.info("Altitudo stretched {} ore placements into {} positions"
-                    + " (band {}x longer, bottom {}x richer).",
-                    stretched, EMITTED.get(), String.format("%.1f", thinning()),
-                    AltitudoConfig.DEEP_ORE_BONUS.get());
+            LOGGER.info("Altitudo moved {} of {} placements into deeper repeats of their band.",
+                    moved, moved + KEPT.get());
         }
     }
 }
